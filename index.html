@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cj스튜디오 이용자</title><style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif;background:#0b1020;color:#fff}
+main{max-width:860px;margin:auto;padding:20px}
+h1{text-align:center}h2{margin:0 0 12px;font-size:19px}
+.card{background:#151d31;border:1px solid #2d3955;border-radius:18px;padding:18px;margin-bottom:14px}
+input,select,button{width:100%;padding:13px;margin-top:9px;border-radius:11px;font:inherit}
+input,select{background:#0b1220;color:#fff;border:1px solid #354462}
+button{border:0;color:#fff;font-weight:800;cursor:pointer}
+.primary{background:#7c3aed}.ok{background:#16a34a}.no{background:#dc2626}.secondary{background:#334155}.del{background:#6b7280}.yt{background:#e11d48}
+.hidden{display:none}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.item{background:#0b1220;border:1px solid #33415e;border-radius:14px;padding:14px;margin-top:10px}
+.song{font-size:18px;font-weight:900}.muted{color:#aab4c8;font-size:13px;margin-top:4px;line-height:1.5}
+.badge{display:inline-block;margin-top:8px;padding:5px 9px;border-radius:999px;background:#29364f}
+.notice,.statusbox{margin-top:10px;padding:10px;background:#172033;border-radius:10px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}
+button:disabled{opacity:.38;cursor:not-allowed;filter:grayscale(1)}
+.empty{text-align:center;color:#9ca3af;padding:20px}
+.topbar{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.topbar button{width:auto;margin:0}
+.counts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.count{text-align:center;padding:10px;background:#0b1220;border-radius:12px;border:1px solid #33415e}
+.count strong{display:block;font-size:22px}
+.toolbar{display:grid;grid-template-columns:2fr 1fr;gap:8px}
+@media(max-width:580px){.grid2,.toolbar,.actions{grid-template-columns:1fr}.counts{grid-template-columns:1fr 1fr}.topbar{align-items:flex-start}}
+</style>
+</head>
+<body><main>
+<h1>🎧 cj스튜디오 이용자</h1>
+
+<section id="authArea">
+  <section class="card">
+    <h2>🔐 이용자 로그인</h2>
+    <input id="loginId" placeholder="아이디" autocomplete="username">
+    <input id="loginPw" type="password" placeholder="비밀번호" autocomplete="current-password">
+    <button id="loginBtn" class="primary">로그인</button>
+  </section>
+
+  <section class="card">
+    <h2>📝 회원가입</h2>
+    <input id="joinName" placeholder="이름 또는 닉네임">
+    <input id="joinId" placeholder="사용할 아이디">
+    <input id="joinPw" type="password" placeholder="비밀번호 4자 이상">
+    <button id="joinBtn" class="secondary">가입 신청</button>
+    <p class="muted">가입 후 관리자가 승인해야 로그인할 수 있습니다.</p>
+  </section>
+</section>
+
+<section id="app" class="hidden">
+  <section class="card">
+    <div class="topbar">
+      <div><strong id="welcome"></strong><div class="muted">승인된 이용자 계정</div></div>
+      <button id="logoutBtn" class="secondary">로그아웃</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div id="timeStatus" class="statusbox"></div>
+    <h2>🎵 신청곡 등록</h2>
+    <input id="song" placeholder="노래 제목">
+    <input id="artist" placeholder="가수">
+    <select id="keyword"><option>기타</option><option>EDM</option><option>K-POP</option><option>POP</option><option>댄스</option><option>발라드</option><option>트로트</option><option>힙합</option></select>
+    <button id="addBtn" class="primary">신청하기</button>
+  </section>
+
+  <section class="card"><h2>📋 내 신청 상태</h2><div id="list"></div></section>
+</section>
+</main>
+<script>
+const USERS_KEY="cj_users_v1",REQUEST_KEY="cj_simple_requests",SCHEDULE_KEY="cj_request_schedule",SESSION_KEY="cj_user_session";
+const $=s=>document.querySelector(s);
+function users(){try{return JSON.parse(localStorage.getItem(USERS_KEY))||[]}catch{return[]}}
+function saveUsers(v){localStorage.setItem(USERS_KEY,JSON.stringify(v))}
+function requests(){try{return JSON.parse(localStorage.getItem(REQUEST_KEY))||[]}catch{return[]}}
+function schedule(){try{return JSON.parse(localStorage.getItem(SCHEDULE_KEY))||{}}catch{return{}}}
+function esc(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function currentUser(){const id=sessionStorage.getItem(SESSION_KEY);return users().find(x=>x.id===id)}
+function fmt(v){return new Intl.DateTimeFormat("ko-KR",{dateStyle:"short",timeStyle:"short"}).format(new Date(v))}
+function availability(){
+ const s=schedule(),now=Date.now();
+ if(!s.start||!s.end)return{open:false,text:"⚪ 신청 시간이 설정되지 않았습니다."};
+ const start=new Date(s.start).getTime(),end=new Date(s.end).getTime();
+ if(now<start)return{open:false,text:`🟡 접수 준비 중<br><span class="muted">${fmt(s.start)}부터 신청 가능합니다.</span>`};
+ if(now<=end)return{open:true,text:`🟢 신청 접수 중<br><span class="muted">${fmt(s.end)}까지 신청 가능합니다.</span>`};
+ return{open:false,text:"🔴 신청 접수가 마감되었습니다."};
+}
+function showApp(){
+ const u=currentUser();
+ if(!u){sessionStorage.removeItem(SESSION_KEY);return}
+ if(u.status!=="승인"){alert("관리자 승인 상태가 아니거나 이용이 정지되었습니다.");sessionStorage.removeItem(SESSION_KEY);return}
+ $("#authArea").classList.add("hidden");$("#app").classList.remove("hidden");$("#welcome").textContent=`${u.name}님`;renderTime();renderList();
+}
+$("#joinBtn").onclick=()=>{
+ const name=$("#joinName").value.trim(),id=$("#joinId").value.trim(),pw=$("#joinPw").value;
+ if(name.length<2||id.length<3||pw.length<4){alert("이름 2자, 아이디 3자, 비밀번호 4자 이상 입력하세요.");return}
+ const data=users();
+ if(data.some(x=>x.id.toLowerCase()===id.toLowerCase())){alert("이미 사용 중인 아이디입니다.");return}
+ data.push({id,name,password:pw,status:"승인 대기",createdAt:new Date().toISOString()});
+ saveUsers(data);alert("가입 신청이 완료되었습니다. 관리자 승인을 기다려 주세요.");
+ $("#joinName").value="";$("#joinId").value="";$("#joinPw").value="";
+}
+$("#loginBtn").onclick=()=>{
+ const id=$("#loginId").value.trim(),pw=$("#loginPw").value,u=users().find(x=>x.id===id&&x.password===pw);
+ if(!u){alert("아이디 또는 비밀번호가 올바르지 않습니다.");return}
+ if(u.status==="승인 대기"){alert("관리자 승인 대기 중입니다.");return}
+ if(u.status==="정지"){alert("관리자가 이용을 정지한 계정입니다.");return}
+ if(u.status!=="승인"){alert("로그인할 수 없는 계정입니다.");return}
+ sessionStorage.setItem(SESSION_KEY,u.id);showApp();
+}
+$("#logoutBtn").onclick=()=>{sessionStorage.removeItem(SESSION_KEY);location.reload()}
+function renderTime(){const a=availability();$("#timeStatus").innerHTML=a.text;$("#addBtn").disabled=!a.open}
+$("#addBtn").onclick=()=>{
+ const u=currentUser();if(!u){location.reload();return}
+ if(!availability().open){alert("현재는 신청 가능한 시간이 아닙니다.");return}
+ const song=$("#song").value.trim(),artist=$("#artist").value.trim(),keyword=$("#keyword").value;
+ if(!song||!artist){alert("노래 제목과 가수를 입력하세요.");return}
+ const data=requests();data.unshift({id:Date.now(),userId:u.id,name:u.name,song,artist,keyword,status:"대기",notice:"신청이 접수되었습니다. 관리자 확인을 기다려 주세요.",createdAt:new Date().toISOString()});
+ localStorage.setItem(REQUEST_KEY,JSON.stringify(data));$("#song").value="";$("#artist").value="";renderList();alert("신청되었습니다.");
+}
+function renderList(){
+ const u=currentUser();if(!u)return;
+ const data=requests().filter(x=>x.userId===u.id);
+ $("#list").innerHTML=data.length?data.map(x=>`<div class="item"><div class="song">${esc(x.song)}</div><div class="muted">${esc(x.artist)} · ${x.createdAt?fmt(x.createdAt):""}</div><span class="badge">${esc(x.status)}</span>${x.notice?`<div class="notice">📢 ${esc(x.notice)}</div>`:""}</div>`).join(""):'<div class="empty">신청곡이 없습니다.</div>';
+}
+setInterval(()=>{if(currentUser()){renderTime();renderList()}},1000);
+window.addEventListener("storage",()=>{if(currentUser()){showApp();renderList()}});
+if(sessionStorage.getItem(SESSION_KEY))showApp();
+</script></body></html>
